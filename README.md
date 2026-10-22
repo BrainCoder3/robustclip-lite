@@ -33,16 +33,18 @@ The experiments show three main trends:
 
 - Retrieval performance strongly depends on the amount of training data.
 - A model trained only on clean data can be highly sensitive to image corruptions, especially Gaussian noise and occlusion.
-- Gaussian-noise-aware training dramatically improves robustness while preserving most of the clean retrieval performance.
+- Gaussian-noise-aware training clearly improves robustness to strong image noise at a small cost on clean data.
 
-At equal training budget, under strong Gaussian noise (`sigma = 0.20`):
+At equal training budget (19 epochs, last state, no checkpoint selection), under strong Gaussian noise (`sigma = 0.20`), mean +- standard deviation over three seeds (section 15):
 
 | Training | Image → Text R@10 | Text → Image R@10 |
 |---|---:|---:|
-| Clean training | 2.7% | 5.0% |
-| Noise-aware training | **10.2%** | **12.4%** |
+| Clean training | 3.9 +- 1.0% | 6.0 +- 1.1% |
+| Noise-aware training | **8.9 +- 1.4%** | **10.2 +- 0.7%** |
 
-The noise-aware model therefore retains substantially more retrieval performance under corruption.
+The noise-aware model is better on every one of the three seeds, by +3.9 to +6.1 points (image → text) and +3.8 to +4.6 points (text → image). On clean images the difference is small: -0.3 points (image → text) and -1.0 point (text → image).
+
+The first, single-seed comparison (sections 11-13) reported larger numbers (2.7% to 10.2%). That run compared a clean model at its last epoch with a noise-aware model at its best validation checkpoint, so it favoured the noise-aware model; the three-seed protocol is the one to rely on.
 
 ---
 
@@ -623,7 +625,7 @@ Text → Image:
 13.5% → 13.2%
 ```
 
-while substantially improving robustness under stronger noise.
+while improving robustness under stronger noise in this run.
 
 At `sigma = 0.20`:
 
@@ -634,7 +636,7 @@ Text → Image
 5.0% → 12.4%
 ```
 
-This represents a strong clean-robustness trade-off in favor of corruption-aware training.
+In this single run the trade-off favours corruption-aware training; section 15 shows the same direction with a smaller gain.
 
 ### Image → Text
 
@@ -678,7 +680,7 @@ Among the tested values, `p = 0.50` provided the best overall robustness while p
   <img src="results/figures/noise_probability_ablation_i2t.png" width="700" alt="Noise probability ablation Image to Text">
 </p>
 
-The ablation confirms that increasing the corruption probability from 0.00 to 0.50 substantially improves robustness under stronger Gaussian noise while maintaining competitive clean retrieval performance.
+In this single-seed ablation, increasing the corruption probability from 0.00 to 0.50 improved robustness under stronger Gaussian noise while keeping clean retrieval competitive. The ablation was not repeated over seeds.
 
 ---
 
@@ -712,15 +714,15 @@ This suggests that the current text representation relies strongly on which sema
 
 ### 4. Corruption-aware training is effective
 
-Noise-aware training greatly improves retrieval under Gaussian noise.
+Noise-aware training improves retrieval under strong Gaussian noise.
 
-The gain remains strong even when the clean and robust models are compared using the same training budget.
+Over three seeds with an identical fixed budget (section 15), image-to-text R@10 at `sigma = 0.20` goes from 3.9% to 8.9% and text-to-image from 6.0% to 10.2%.
 
 ---
 
 ### 5. Robustness does not necessarily require a large clean-performance sacrifice
 
-With `p = 0.50`, the robust model preserves nearly all clean performance while dramatically outperforming the clean model under strong noise.
+With `p = 0.50`, the robust model keeps most of the clean performance (-0.3 and -1.0 point over three seeds) while clearly outperforming the clean model under strong noise.
 
 ---
 
@@ -744,7 +746,25 @@ python experiments/multi_seed_noise.py --seeds 42 43 44      # writes results/mu
 The script keeps the images in memory as 224x224 uint8 tensors (about 0.9 GB for the training split).
 `--fake` runs the whole code path on random data without downloading anything.
 
-Results: *to be added from `results/multi_seed_noise.md` after the run.*
+Results (seeds 42, 43, 44; R@10 in %, mean +- sample standard deviation, 1000 test images, 1000 candidates):
+
+| Test sigma | I→T clean | I→T noise-aware | T→I clean | T→I noise-aware |
+|---:|---:|---:|---:|---:|
+| 0.00 | 12.5 +- 0.7 | 12.1 +- 1.2 | 12.6 +- 1.0 | 11.6 +- 0.9 |
+| 0.05 | 10.2 +- 0.5 | 12.0 +- 0.9 | 11.7 +- 0.5 | 11.8 +- 1.0 |
+| 0.10 | 7.1 +- 0.7 | 11.6 +- 1.0 | 9.1 +- 0.9 | 11.4 +- 0.7 |
+| 0.20 | 3.9 +- 1.0 | **8.9 +- 1.4** | 6.0 +- 1.1 | **10.2 +- 0.7** |
+
+<p align="center">
+  <img src="results/figures/multi_seed_noise.png" width="760" alt="Clean vs noise-aware training over three seeds">
+</p>
+
+- At `sigma = 0.20` the noise-aware model wins on all three seeds: +4.9, +6.1, +3.9 points (image → text) and +4.6, +3.8, +4.0 points (text → image). The noise-aware curve is also flatter at `sigma = 0.10`.
+- On clean images the two models are close: -0.3 point (image → text) and -1.0 point (text → image) on average, within about one standard deviation, but the sign is negative for text → image on all three seeds.
+- The gain is smaller than in the first single-seed comparison (sections 12-13). Three seeds are still a small sample: the standard deviations are 0.7 to 1.4 points, and no significance test was run.
+- Both models used the same architecture, optimizer, data and 19 epochs; the test set was evaluated once per model and nothing was selected on it.
+
+Raw per-seed numbers and training curves are in `results/multi_seed_noise.json`.
 
 ---
 
@@ -941,22 +961,22 @@ The experiments show that:
 - clean multimodal representations can be highly fragile to input corruption,
 - different text corruptions affect the model in different ways,
 - lexical corruption is more harmful than moderate word-order perturbation,
-- and simple corruption-aware contrastive training can substantially improve robustness.
+- and simple corruption-aware contrastive training improves robustness to strong image noise at a small cost on clean data.
 
-The most important result is that Gaussian-noise-aware training greatly improves retrieval under strong image noise while causing only a small reduction in clean performance.
+The most important result is that Gaussian-noise-aware training improves retrieval under strong image noise on every one of three seeds, with only a small reduction in clean performance.
 
-At equal training budget and `sigma = 0.20`:
+At equal training budget and `sigma = 0.20` (mean over three seeds):
 
 ```text
 Image → Text R@10
-Clean training      : 2.7%
-Noise-aware training: 10.2%
+Clean training      : 3.9%
+Noise-aware training: 8.9%
 Text → Image R@10
-Clean training      : 5.0%
-Noise-aware training: 12.4%
+Clean training      : 6.0%
+Noise-aware training: 10.2%
 ```
 
-These results illustrate a clear robustness-performance trade-off and show that even simple augmentation strategies can significantly improve the stability of learned multimodal representations.
+These results show a robustness-performance trade-off in favour of corruption-aware training, and that even a simple augmentation can improve the stability of learned multimodal representations. The study is small: one dataset, one architecture, one corruption type and three seeds.
 
 ---
 
