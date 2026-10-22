@@ -553,6 +553,12 @@ Image → Text R@10
 
 The experiment confirms that learning multimodal alignment from scratch is highly data-dependent.
 
+**Why the 100 % row (9.4 %) is lower than the clean baseline (16.5 %).** These runs used early stopping with a
+patience of 3: the best validation loss was at epoch 11 and training stopped three epochs later. The baseline of section 7 was trained longer: it was resumed by hand and
+reached its best validation loss at epoch 24. The rows of this table are comparable with each other (same recipe,
+same stopping rule), but the 100 % row is an under-trained model, not the best model one can get from the full
+training set.
+
 <p align="center">
   <img src="results/figures/low_data.png" width="700" alt="Limited-data retrieval results">
 </p>
@@ -592,6 +598,12 @@ Training budget         : 19 epochs
 A clean model and a noise-aware model were both trained for exactly 19 epochs.
 
 This controls for the number of training epochs and helps isolate the effect of corruption-aware training.
+
+Two details of this first run are not perfectly symmetric. The clean model is the state after the 19th epoch, while
+the noise-aware model is the checkpoint with the best clean validation loss (early stopping), which happened at
+epoch 19. And the training noise level (`sigma = 0.10`) and probability (`p = 0.50`) were chosen after looking at
+test results, so the test set was used for model selection here. Section 15 repeats the comparison over several
+seeds with a strictly fixed protocol that avoids both issues.
 
 Results:
 
@@ -712,43 +724,52 @@ With `p = 0.50`, the robust model preserves nearly all clean performance while d
 
 ---
 
-## 15. Repository Structure
+## 15. Multi-Seed Check
 
-```text
-robustclip_lite/
-│
-├── notebooks/
-│   └── 01_data_exploration.ipynb
-│
-├── src/
-│
-├── models/
-│   ├── best_baseline.pt
-│   ├── low_data_10.pt
-│   ├── low_data_25.pt
-│   ├── low_data_50.pt
-│   ├── low_data_100.pt
-│   ├── clean_fixed_19.pt
-│   └── noise_aware_sigma01.pt
-│
-├── results/
-│   ├── baseline_results.json
-│   ├── robustness_results.json
-│   ├── low_data_results.json
-│   ├── noise_aware_results.json
-│   ├── noise_ablation_19epochs.json
-│   ├── noise_probability_ablation.json
-│   ├── final_summary.json
-│   └── figures/
-│
-└── README.md
+The single-seed results above could depend on the training seed. `experiments/multi_seed_noise.py` repeats the
+clean vs noise-aware comparison with a fixed protocol:
+
+- both models are trained for exactly 19 epochs and the **last** state is evaluated (no early stopping, no
+  checkpoint chosen on the test set, so the two models are treated identically);
+- `sigma = 0.10` and `p = 0.50` are fixed in advance, nothing is tuned on the test set;
+- the test set is evaluated once per trained model, with the same fixed noise seed for every model;
+- seeds 42, 43 and 44 by default, reported as mean and sample standard deviation.
+
+```bash
+pip install -r requirements.txt
+python -m unittest discover -s tests
+python experiments/multi_seed_noise.py --seeds 42 43 44      # writes results/multi_seed_noise.{json,md} and a figure
 ```
 
-The exact file structure may evolve as the notebook is progressively refactored into reusable modules.
+The script keeps the images in memory as 224x224 uint8 tensors (about 0.9 GB for the training split).
+`--fake` runs the whole code path on random data without downloading anything.
+
+Results: *to be added from `results/multi_seed_noise.md` after the run.*
 
 ---
 
-## 15. Running the Project
+## 16. Repository Structure
+
+```text
+robustclip-lite/
+├── notebooks/
+│   └── 01_data_exploration.ipynb      # original exploratory work, all single-seed results of sections 7-13
+├── src/robustclip_lite/               # the same model and training code as modules
+│   ├── model.py                       # encoders, projection heads, contrastive loss
+│   ├── data.py                        # vocabulary, tokenisation, cached Flickr8k dataset
+│   ├── corruption.py                  # Gaussian noise, per-image random corruption
+│   ├── metrics.py                     # Recall@K and noisy retrieval evaluation
+│   └── train.py                       # fixed-budget training with optional noise-aware augmentation
+├── experiments/
+│   └── multi_seed_noise.py            # clean vs noise-aware over several seeds (section 15)
+├── tests/test_core.py                 # unit tests for metrics, noise, tokeniser and model
+├── results/                           # JSON, CSV and figures
+└── README.md
+```
+
+Model checkpoints (`models/*.pt`) are not published (see `.gitignore`).
+
+## 17. Running the Project
 
 The project was developed using PyTorch with CUDA support.
 
@@ -779,7 +800,7 @@ notebooks/01_data_exploration.ipynb
 
 ---
 
-## 15. Reproducibility
+## 18. Reproducibility
 
 Random seeds are fixed for several controlled experiments.
 
@@ -811,7 +832,7 @@ to keep the evaluation deterministic.
 
 ---
 
-## 15. Limitations
+## 19. Limitations
 
 This project intentionally uses a lightweight setup and has several limitations.
 
@@ -853,7 +874,15 @@ Subword tokenizers such as BPE or WordPiece would probably provide better spelli
 
 ---
 
-### Single-seed experiments
+### Hyper-parameters chosen on the test set
+
+In sections 11-13 the training noise level and the noise probability were compared on the test set. The development
+split should have been used. The multi-seed experiment of section 15 fixes `sigma = 0.10` and `p = 0.50` in advance
+and does not select anything on the test set.
+
+---
+
+### Single-seed experiments (sections 7-13)
 
 Most experiments currently use one main seed.
 
@@ -877,7 +906,7 @@ Future experiments could include corruption-aware training for:
 
 ---
 
-## 15. Future Work
+## 20. Future Work
 
 Possible extensions include:
 
@@ -902,7 +931,7 @@ This would help distinguish simple corruption memorization from more general rob
 
 ---
 
-## 15. Conclusion
+## 21. Conclusion
 
 RobustCLIP-Lite demonstrates that a small vision-language model can learn meaningful multimodal representations from scratch on Flickr8k.
 
@@ -931,7 +960,7 @@ These results illustrate a clear robustness-performance trade-off and show that 
 
 ---
 
-## 15. Project Motivation
+## 22. Project Motivation
 
 This project was developed as a hands-on study of multimodal deep learning.
 
